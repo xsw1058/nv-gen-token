@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: gen-join-token
+  name: gen-join-token
+  namespace: neuvector
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gen-join-token
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: gen-join-token
+    spec:
+      containers:
+        - env:
+            - name: CTRL_API_SVC
+              value: "neuvector-svc-controller:10443"
+#            - name: CTRL_USERNAME
+#              value: admin
+#            - name: CTRL_PASSWORD
+#              value: admin
+          envFrom:
+            - secretRef:
+                name: neuvector-admin
+#          image: registry.cn-hangzhou.aliyuncs.com/xsw1058/gen-join-token:latest
+#          imagePullPolicy: Always
+          image: harbor.mcdchina.net/mcd-public/neuvector/gen-join-token:0.0.3
+          imagePullPolicy: IfNotPresent
+          name: gen-join-token
+          ports:
+            - containerPort: 8080
+              name: http
+              protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /healthz
+              port: 8080
+              scheme: HTTP
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            limits:
+              cpu: "1"
+              memory: 1Gi
+            requests:
+              cpu: 100m
+              memory: 50Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: gen-join-token
+  name: gen-join-token
+spec:
+  ports:
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: 8080
+  selector:
+    app: gen-join-token
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gen-join-token
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: "*.mcd.cloud"
+      http:
+        paths:
+          - backend:
+              service:
+                name: gen-join-token
+                port:
+                  number: 80
+            path: /join_token
+            pathType: Prefix
